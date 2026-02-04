@@ -6,6 +6,8 @@ Extracts text and data from images using Gemini's vision capabilities
 
 import os
 import sys
+import json
+import argparse
 import google.generativeai as genai
 from PIL import Image
 from dotenv import load_dotenv
@@ -63,16 +65,23 @@ def perform_ocr(image_path, api_key=None, prompt="Extract all text and data from
 
 def main():
     """Main function to run OCR for all JPGs in a specified directory"""
-    if len(sys.argv) < 2:
-        print("Usage: python ocr_gemini.py <images_directory> [api_key]")
-        print("\nExample:")
-        print("  python ocr_gemini.py ./images")
-        print("  python ocr_gemini.py /path/to/your/images YOUR_API_KEY")
-        print("\nNote: You can also set GEMINI_API_KEY environment variable")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Run OCR on all JPGs in a directory using Google Gemini and write results to a file."
+    )
+    parser.add_argument("images_directory", help="Directory containing images to OCR")
+    # Backward compatible positional API key (optional)
+    parser.add_argument("api_key", nargs="?", default=None, help="Optional Gemini API key")
+    parser.add_argument(
+        "--out",
+        dest="out_file",
+        default=None,
+        help="Output JSON file path (default: <images_directory>/ocr_results.json)",
+    )
+    args = parser.parse_args()
 
-    images_directory = sys.argv[1]
-    api_key = sys.argv[2] if len(sys.argv) > 2 else None
+    images_directory = args.images_directory
+    api_key = args.api_key
+    out_file = args.out_file or os.path.join(images_directory, "ocr_results.json")
 
     if not os.path.isdir(images_directory):
         print(f"[❌ main] Error: Directory not found: {images_directory}")
@@ -81,8 +90,8 @@ def main():
     print(f"[📂 main] Processing images in directory: {images_directory}")
     
     all_results = {}
-    for filename in os.listdir(images_directory):
-        if filename.lower().endswith(".jpg"):
+    for filename in sorted(os.listdir(images_directory)):
+        if filename.lower().endswith((".jpg", ".jpeg")):
             image_path = os.path.join(images_directory, filename)
             print(f"\n" + "~"*60)
             print(f"Processing file: {filename}")
@@ -96,6 +105,13 @@ def main():
             print("="*60)
             print(result)
             print("="*60)
+
+    out_dir = os.path.dirname(out_file)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(out_file, "w", encoding="utf-8") as f:
+        json.dump(all_results, f, ensure_ascii=False, indent=2)
+    print(f"[💾 main] Wrote OCR results to: {out_file}")
 
     return all_results
 
